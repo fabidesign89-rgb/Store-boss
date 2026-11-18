@@ -405,7 +405,7 @@ nav button.on em{animation:navpop .55s cubic-bezier(.2,.9,.3,1.2)}
 
 <div class="search"><span>🔍</span><input id="q" type="search" placeholder="Chercher un téléphone, un casque…"></div>
 
-<div class="mini"><span>📍 Goudel</span><span>🕗 8h–22h30</span><span class="stat"><i></i><em>…</em></span></div>
+<div class="mini"><a href="https://maps.app.goo.gl/ezgzDL2t8JdX6HL66" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>📍 Goudel</span></a><span>🕗 8h30–22h30</span><span class="stat"><i></i><em>…</em></span></div>
 <div class="slides" id="slides">
   <div class="slide s1"><div><h2>Les derniers smartphones</h2><p>Choisissez, puis commandez sur WhatsApp.</p><button class="go" data-go="phones">Voir</button></div><div class="art"><i class="ring"></i><i class="disc"></i><img src="p30.jpg" alt=""><b class="sp s1">✦</b><b class="sp s2">✦</b><b class="sp s3">✦</b></div></div>
   <div class="slide s2"><div><h2>Audio & casques</h2><p>Un son net, partout avec vous.</p><button class="go" data-go="audio">Voir</button></div><div class="art"><i class="ring"></i><i class="disc"></i><img src="p29.jpg" alt=""><b class="sp s1">✦</b><b class="sp s2">✦</b><b class="sp s3">✦</b></div></div>
@@ -430,11 +430,12 @@ nav button.on em{animation:navpop .55s cubic-bezier(.2,.9,.3,1.2)}
 <div class="sec"><h2>📍 Nous trouver</h2></div>
 <div class="shop" id="shop">
   <div class="srow"><span class="si">📍</span><div><small>Adresse</small><b>Goudel</b></div>
-    <a class="smap" href="https://www.google.com/maps/search/?api=1&query=Goudel+Niamey+Niger" target="_blank" rel="noopener">🗺️ Itinéraire</a></div>
-  <div class="srow h"><span class="si">🕗</span><div><small>Horaires · 7j/7</small><b>8h00 à 22h30</b></div>
+    <a class="smap" href="https://maps.app.goo.gl/ezgzDL2t8JdX6HL66" target="_blank" rel="noopener">🗺️ Itinéraire</a></div>
+  <div class="srow"><span class="si">📞</span><div><small>Téléphone</small><b>+227 94 75 51 51</b></div><a class="smap" href="tel:+22794755151">📞 Appeler</a></div>
+  <div class="srow h"><span class="si">🕗</span><div><small>Horaires · 7j/7</small><b>8h30 à 22h30</b></div>
     <span class="stat"><i></i><em>…</em></span></div>
 </div>
-<p class="foot">OMS Service · Goudel · Ouvert de 8h à 22h30</p>
+<p class="foot">OMS Service · Goudel · Ouvert de 8h30 à 22h30</p>
 <button class="up" id="up" aria-label="Haut de page">↑</button>
 
 <nav id="nav">
@@ -606,8 +607,8 @@ const DEF=[
 ];
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const store={get(k,d){try{const v=localStorage.getItem('oms_'+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem('oms_'+k,JSON.stringify(v))}catch(e){}}};
-let products=store.get('products2',DEF), favs=store.get('favs',[]), sel=store.get('sel',{}), cfg=store.get('cfg',{wa:'22700000000',pin:'1234'});
-let cat='all', query='', sortBy='def';
+let products=store.get('products2',DEF), favs=store.get('favs',[]), sel=store.get('sel',{}), cfg=store.get('cfg',{wa:'22794755151',pin:'1234'});
+let cat='all', query='', sortBy='def'; if(cfg.wa==='22700000000')cfg.wa='22794755151';
 const fmt=n=>n.toLocaleString('fr-FR').replace(/ /g,' ')+' FCFA';
 const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1600)};
 var waLink=txt=>'https://wa.me/'+cfg.wa+(txt?'?text='+encodeURIComponent(txt):'');
@@ -680,7 +681,7 @@ document.addEventListener('click',e=>{
     if(v==='fav'){renderFav();open('#favSheet')}
     if(v==='sel'){renderSel();open('#selSheet')}
     if(v==='set'){open('#setSheet')}
-    if(v==='wa'){open();window.open(waLink('Bonjour OMS Service,'),'_blank');setNav('home')}
+    if(v==='wa'){open();setNav('home');if(!cfg.wa||cfg.wa==='22700000000'){toast('Numéro WhatsApp à renseigner dans Admin');return}const u=waLink('Bonjour OMS Service,');if(!window.open(u,'_blank'))location.href=u}
   }
 });
 $$('.sheet').forEach(s=>s.addEventListener('click',e=>{if(e.target===s){open();setNav('home')}}));
@@ -839,10 +840,10 @@ par();setAct(0);
 /* ===== HORAIRES ===== */
 function shopStatus(){
   let h=0,m=0;try{const p=new Intl.DateTimeFormat('fr-FR',{timeZone:'Africa/Niamey',hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(new Date());h=+p.find(x=>x.type==='hour').value;m=+p.find(x=>x.type==='minute').value}catch(e){const d=new Date();h=d.getUTCHours()+1;m=d.getUTCMinutes();h%=24}
-  const t=h*60+m,o=8*60,c=22*60+30;
+  const t=h*60+m,o=8*60+30,c=22*60+30;
   let cls,txt;
   if(t>=o&&t<c){if(c-t<=30){cls='soon';txt='Ferme bientôt · 22h30'}else{cls='open';txt='Ouvert maintenant'}}
-  else{cls='closed';txt=t<o?'Fermé · ouvre à 8h00':'Fermé · rouvre demain 8h00'}
+  else{cls='closed';txt=t<o?'Fermé · ouvre à 8h30':'Fermé · rouvre demain 8h30'}
   $$('.stat').forEach(el=>{el.className='stat '+cls;const e=el.querySelector('em');if(e)e.textContent=el.closest('.mini')?({open:'Ouvert',soon:'Ferme bientôt',closed:'Fermé'})[cls]:txt});
 }
 shopStatus();setInterval(shopStatus,30000);
@@ -912,14 +913,14 @@ const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;let boot=true;
 // [français, anglais, haoussa]
 const R=[
 ["Chercher un téléphone, un casque…","Search for a phone, headphones…","Nemi waya, hedifon…"],
-["🕗 8h–22h30","🕗 8am–10:30pm","🕗 8:00 na safe–10:30 na dare"],
+["🕗 8h30–22h30","🕗 8:30am–10:30pm","🕗 8:30 na safe–10:30 na dare"],
 ["Ouvert","Open","A buɗe"],
 ["Ferme bientôt","Closing soon","Za a rufe nan ba da jimawa ba"],
 ["Fermé","Closed","A rufe"],
 ["Ouvert maintenant","Open now","A buɗe yanzu"],
 ["Ferme bientôt · 22h30","Closing soon · 10:30pm","Za a rufe nan ba da jimawa ba · 10:30 na dare"],
-["Fermé · ouvre à 8h00","Closed · opens at 8am","A rufe · za a buɗe 8:00 na safe"],
-["Fermé · rouvre demain 8h00","Closed · reopens tomorrow at 8am","A rufe · za a sake buɗewa gobe 8:00 na safe"],
+["Fermé · ouvre à 8h30","Closed · opens at 8:30am","A rufe · za a buɗe 8:30 na safe"],
+["Fermé · rouvre demain 8h30","Closed · reopens tomorrow at 8:30am","A rufe · za a sake buɗewa gobe 8:30 na safe"],
 ["Les derniers smartphones","The latest smartphones","Sabbin wayoyin salula"],
 ["Choisissez, puis commandez sur WhatsApp.","Choose, then order on WhatsApp.","Zaɓi, sannan ka yi oda a WhatsApp."],
 ["Voir","View","Duba"],
@@ -956,9 +957,9 @@ const R=[
 ["Adresse","Address","Adireshi"],
 ["🗺️ Itinéraire","🗺️ Directions","🗺️ Hanya"],
 ["Horaires · 7j/7","Hours · 7 days a week","Lokutan aiki · kullum"],
-["8h00 à 22h30","8:00am to 10:30pm","8:00 na safe zuwa 10:30 na dare"],
-["OMS Service · Goudel · Ouvert de 8h à 22h30","OMS Service · Goudel · Open 8am to 10:30pm","OMS Service · Goudel · A buɗe daga 8 na safe zuwa 10:30 na dare"],
-["Haut de page","Back to top","Komawa sama"],
+["8h30 à 22h30","8:30am to 10:30pm","8:30 na safe zuwa 10:30 na dare"],
+["OMS Service · Goudel · Ouvert de 8h30 à 22h30","OMS Service · Goudel · Open 8:30am to 10:30pm","OMS Service · Goudel · A buɗe daga 8:30 na safe zuwa 10:30 na dare"],
+["Téléphone","Phone","Waya"], ["📞 Appeler","📞 Call","📞 Kira"], ["Haut de page","Back to top","Komawa sama"],
 ["Accueil","Home","Gida"],
 ["Favoris","Favorites","Na so"],
 ["Sélection","Selection","Zaɓaɓɓu"],
