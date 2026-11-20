@@ -1,0 +1,12 @@
+{
+  "name": "digifaso",
+  "version": "1.0.0",
+  "description": "DIGIFASO — plateforme de services digitaux (catalogue, devis/commandes, messagerie, administration)",
+  "private": true,
+  "main": "server.js",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"tests/*.test.js\""
+  }
+}
