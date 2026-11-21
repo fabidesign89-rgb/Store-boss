@@ -9,14 +9,17 @@ try {
   }
 } catch {}
 const { createApp } = require('./src/app');
-const { server, bootstrapInfo } = createApp();
+const app = createApp();
 const port = Number(process.env.PORT || 3000);
-server.listen(port, '0.0.0.0', () => {
-  console.log(`DIGIFASO démarré sur http://localhost:${port}`);
-  if (bootstrapInfo) {
-    console.log(`\nCompte administrateur créé : ${bootstrapInfo.email}`);
-    if (bootstrapInfo.generated) console.log(`Mot de passe temporaire (affiché une seule fois) : ${bootstrapInfo.password}`);
-    console.log('Changez ce mot de passe dès la première connexion.\n');
-  }
-});
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => process.exit(0)));
+app.ready.then(() => {
+  app.server.listen(port, '0.0.0.0', () => {
+    console.log(`DIGIFASO démarré sur http://localhost:${port} (base : ${app.db.kind})`);
+    const b = app.bootstrapInfo;
+    if (b) {
+      console.log(`\nCompte administrateur créé : ${b.email}`);
+      if (b.generated) console.log(`Mot de passe temporaire (affiché une seule fois) : ${b.password}`);
+      console.log('Changez ce mot de passe dès la première connexion.\n');
+    }
+  });
+}).catch((e) => { console.error('Démarrage impossible :', e.message); process.exit(1); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => app.server.close(() => process.exit(0)));

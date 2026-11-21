@@ -13,6 +13,6 @@ Construction autonome demandée par le propriétaire en une seule session (le d�
 | 6. Messagerie conseiller | Fait | API + navigateur | accès restreint vérifié |
 | 7. Administration | Fait | API + navigateur | CRUD, rôles, journal |
 | 8. Notifications / intégrations | Partiel | — | notifications internes seulement ; e-mail/SMS/paiement/réseaux non implémentés |
-| 9. Vérification et déploiement | Partiel | 15 API + 1 parcours E2E OK | non déployé en ligne ; audit sécurité externe, accessibilité (lecteur d'écran) et tests de charge non faits |
+| 9. Vérification et déploiement | Partiel | 15 API + 1 parcours E2E OK | non déployé ; audit sécurité externe, accessibilité (lecteur d'écran) et tests de charge non faits |
 
 Confirmation du propriétaire : en attente.

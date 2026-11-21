@@ -13,7 +13,7 @@ Dans l'admin : *Utilisateurs* → créer des conseillers ; *Paramètres* → té
 
 ## Tests
 ```
-npm test            # 15 tests d'API (accès, isolation clients, fichiers, CRUD, sécurité)
+npm test            # 16 tests d'API (aussi : TEST_TURSO_FAKE=1 npm test, via le protocole Turso) (accès, isolation clients, fichiers, CRUD, sécurité)
 node tests/e2e.js   # parcours complet dans Chrome mobile/bureau (nécessite Playwright + Chrome)
 ```
 
@@ -25,8 +25,19 @@ Accueil, catalogue (6 catégories, 12 services modifiables, recherche/filtre), f
 - Pas d'envoi d'e-mails/SMS : les notifications sont dans l'application (pastille « nouveau »). Mot de passe oublié : réinitialisation par un administrateur.
 - Messagerie par rafraîchissement toutes les 8 s (pas de temps réel instantané).
 - Tarifs « Sur devis », pages légales, À propos, coordonnées : **à renseigner par le propriétaire** (`docs/QUESTIONS_A_CONFIRMER.md`).
-- SQLite : adapté à une petite/moyenne activité sur un seul serveur.
+- Fichiers clients stockés dans la base (3 Mo max chacun) : adapté à un volume modeste.
 
-## Déploiement
-Nécessite un hébergeur Node ou Docker avec **disque persistant** (`DATA_DIR`) et HTTPS (`NODE_ENV=production`).
-`Dockerfile` et `render.yaml` fournis. **Sauvegarde** : copier régulièrement le dossier `DATA_DIR` (arrêter le serveur ou utiliser `sqlite3 digifaso.db ".backup copie.db"`). **Restauration** : remettre le dossier en place puis redémarrer.
+## Déploiement sur Vercel (recommandé pour démarrer)
+Vercel n'a pas de disque durable : les données sont dans **Turso** (SQLite hébergé, plan gratuit) et les fichiers clients sont stockés dans la base.
+1. Créez une base sur turso.tech ; notez son URL (`libsql://…`) et créez un jeton d'accès (« token »).
+2. Mettez le contenu de ce dossier **à la racine** d'un dépôt GitHub (`package.json` et `vercel.json` à la racine, pas dans un sous-dossier).
+3. Sur Vercel : *Add New → Project*, importez le dépôt, laissez « Framework Preset : Other », puis ajoutez les variables d'environnement :
+   `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (8+ caractères, lettre + chiffre), `TRUST_PROXY=1`.
+4. Déployez. Au premier appel, les tables, le catalogue initial et le compte administrateur sont créés automatiquement.
+5. Choisissez la région de la fonction Vercel proche de celle de la base Turso (Réglages → Functions) pour la vitesse.
+Limites Vercel : corps de requête 4,5 Mo → fichiers limités à **3 Mo** ; la limitation anti-abus des tentatives de connexion est en mémoire par instance (best-effort).
+Ce chemin Vercel/Turso est testé avec un faux serveur respectant le protocole Turso, **pas encore contre un vrai compte Turso ni un vrai déploiement Vercel**.
+
+## Autres hébergeurs (serveur permanent)
+`Dockerfile` et `render.yaml` fournis (SQLite local sur disque persistant `DATA_DIR`, HTTPS, `NODE_ENV=production`).
+**Sauvegarde** : copier le dossier `DATA_DIR` (ou, avec Turso, utiliser les sauvegardes/exports Turso). **Restauration** : remettre le dossier en place puis redémarrer.

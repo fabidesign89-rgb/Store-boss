@@ -1,14 +1,8 @@
 'use strict';
-const { DatabaseSync } = require('node:sqlite');
-const fs = require('node:fs');
-const path = require('node:path');
+const SCHEMA_VERSION = 1;
 
-function openDb(dataDir) {
-  fs.mkdirSync(dataDir, { recursive: true });
-  fs.mkdirSync(path.join(dataDir, 'uploads'), { recursive: true });
-  const db = new DatabaseSync(dataDir === ':memory:' ? ':memory:' : path.join(dataDir, 'digifaso.db'));
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
-  db.exec(`
+async function openDb(ad) {
+  await ad.exec(`
 CREATE TABLE IF NOT EXISTS users(
   id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL,
   phone TEXT DEFAULT '', password_hash TEXT NOT NULL,
@@ -39,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_advisor ON orders(advisor_id);
 CREATE TABLE IF NOT EXISTS order_files(
   id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), uploader_id INTEGER NOT NULL REFERENCES users(id),
-  original_name TEXT NOT NULL, stored_name TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL,
+  original_name TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, data BLOB NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')));
 CREATE TABLE IF NOT EXISTS status_history(
   id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), status TEXT NOT NULL,
@@ -65,17 +59,16 @@ CREATE TABLE IF NOT EXISTS audit_log(
   id INTEGER PRIMARY KEY, actor_id INTEGER, action TEXT NOT NULL, target TEXT DEFAULT '', detail TEXT DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now')));
 `);
-  return db;
+  return ad;
 }
 
 const SETTING_KEYS = ['site_name', 'tagline', 'country', 'currency', 'timezone', 'phone', 'email', 'whatsapp',
   'address', 'hours', 'payment_methods'];
 
-function seed(db) {
-  const hasCat = db.prepare('SELECT COUNT(*) c FROM categories').get().c;
-  const insSet = db.prepare('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)');
+async function seed(db) {
+  const hasCat = (await db.get('SELECT COUNT(*) c FROM categories')).c;
   const defaults = { site_name: 'DIGIFASO', tagline: 'Votre présence digitale, gérée par des professionnels' };
-  for (const k of SETTING_KEYS) insSet.run(k, defaults[k] || '');
+  for (const k of SETTING_KEYS) await db.run('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)', [k, defaults[k] || '']);
   if (hasCat) return;
   // Contenu initial issu du cahier des charges (§3). Aucun tarif inventé : « Sur devis » (price_text vide).
   const cats = [
@@ -86,9 +79,8 @@ function seed(db) {
     ['production-audiovisuelle', 'Production audiovisuelle', 'Spots publicitaires et vidéos promotionnelles.', '🎬'],
     ['marketing-digital', 'Marketing et publicité digitale', 'Stratégie, campagnes publicitaires, analyse et recommandations.', '📈'],
   ];
-  const insCat = db.prepare('INSERT INTO categories(slug,name,description,icon,position) VALUES(?,?,?,?,?)');
-  cats.forEach((c, i) => insCat.run(c[0], c[1], c[2], c[3], i));
-  const cid = (slug) => db.prepare('SELECT id FROM categories WHERE slug=?').get(slug).id;
+  for (const [i, c] of cats.entries()) await db.run('INSERT OR IGNORE INTO categories(slug,name,description,icon,position) VALUES(?,?,?,?,?)', [c[0], c[1], c[2], c[3], i]);
+  const cid = async (slug) => (await db.get('SELECT id FROM categories WHERE slug=?', [slug])).id;
   const svc = [
     ['community-management', 'animation-de-page', 'Animation de page et communauté',
       'Animation régulière de votre page et de votre communauté.',
@@ -130,9 +122,10 @@ function seed(db) {
       'Mise en place et suivi de vos campagnes.', 'Accompagnement pour vos campagnes publicitaires. Important : les budgets publicitaires versés aux plateformes sont distincts des frais de prestation DIGIFASO.',
       ['Paramétrage de campagne', 'Suivi et recommandations'], ['Plateformes publicitaires'], 'À définir avec votre conseiller'],
   ];
-  const insSvc = db.prepare(`INSERT INTO services(category_id,slug,name,summary,description,deliverables,options,delay_text,price_text,position)
-    VALUES(?,?,?,?,?,?,?,?,?,?)`);
-  svc.forEach((s, i) => insSvc.run(cid(s[0]), s[1], s[2], s[3], s[4], JSON.stringify(s[5]), JSON.stringify(s[6]), s[7], '', i));
+  for (const [i, v] of svc.entries()) {
+    await db.run(`INSERT OR IGNORE INTO services(category_id,slug,name,summary,description,deliverables,options,delay_text,price_text,position)
+      VALUES(?,?,?,?,?,?,?,?,?,?)`, [await cid(v[0]), v[1], v[2], v[3], v[4], JSON.stringify(v[5]), JSON.stringify(v[6]), v[7], '', i]);
+  }
 }
 
 module.exports = { openDb, seed, SETTING_KEYS };

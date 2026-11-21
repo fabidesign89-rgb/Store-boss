@@ -7,8 +7,10 @@ const { createApp } = require('../src/app');
 
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'df-e2e-'));
-  const app = createApp({ dataDir: dir, adminEmail: 'admin@test.bf', adminPassword: 'Admin1234' });
-  await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
+  const o = { dataDir: dir, adminEmail: 'admin@test.bf', adminPassword: 'Admin1234' }; let fake;
+  if (process.env.TEST_TURSO_FAKE) { fake = await require('./fake-turso').start(); Object.assign(o, { tursoUrl: fake.url, tursoToken: fake.token }); }
+  const app = createApp(o);
+  await app.ready.then(() => new Promise((r) => app.server.listen(0, '127.0.0.1', r)));
   const base = `http://127.0.0.1:${app.server.address().port}`;
   const shots = process.env.SHOTS || ''; if (shots) fs.mkdirSync(shots, { recursive: true });
   const browser = await chromium.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', args: ['--no-sandbox'] });

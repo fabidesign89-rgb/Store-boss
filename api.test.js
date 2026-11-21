@@ -7,10 +7,15 @@ const path = require('node:path');
 const { createApp } = require('../src/app');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'digifaso-'));
-const app = createApp({ dataDir: dir, adminEmail: 'admin@test.bf', adminPassword: 'Admin1234', loginMax: 5 });
-let base;
-test.before(async () => { await new Promise((r) => app.server.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${app.server.address().port}`; });
-test.after(async () => { await new Promise((r) => app.server.close(r)); fs.rmSync(dir, { recursive: true, force: true }); });
+// TEST_TURSO_FAKE=1 : mêmes tests, mais la couche base de données passe par le protocole Turso (faux serveur local)
+let app, fake, base;
+const makeApp = async () => {
+  const o = { dataDir: dir, adminEmail: 'admin@test.bf', adminPassword: 'Admin1234', loginMax: 5 };
+  if (process.env.TEST_TURSO_FAKE) { fake = await require('./fake-turso').start(); Object.assign(o, { tursoUrl: fake.url, tursoToken: fake.token }); }
+  app = createApp(o);
+};
+test.before(async () => { await makeApp(); await app.ready.then(() => new Promise((r) => app.server.listen(0, '127.0.0.1', r))); base = `http://127.0.0.1:${app.server.address().port}`; });
+test.after(async () => { await new Promise((r) => app.server.close(r)); if (fake) await fake.close(); fs.rmSync(dir, { recursive: true, force: true }); });
 
 function client() {
   let cookie = '';
@@ -55,7 +60,7 @@ test('inscription : validation, doublon, mot de passe haché', async () => {
   assert.equal(r.status, 201); assert.equal(r.body.user.role, 'client', 'le rôle ne peut pas être choisi');
   assert.equal((await bob.post('/api/auth/register', { name: 'Bob Client', email: 'bob@test.bf', password: 'Motdepasse2' })).status, 201);
   assert.equal((await client().post('/api/auth/register', { name: 'Alice', email: 'ALICE@test.bf', password: 'Motdepasse1' })).status, 409);
-  const h = app.db.prepare("SELECT password_hash FROM users WHERE email='alice@test.bf'").get().password_hash;
+  const h = (await app.db.get("SELECT password_hash FROM users WHERE email='alice@test.bf'")).password_hash;
   assert.ok(h.startsWith('scrypt$') && !h.includes('Motdepasse1'));
   assert.equal((await alice.get('/api/auth/me')).body.user.email, 'alice@test.bf');
 });
@@ -101,7 +106,7 @@ test('commande : validation, enregistrement, persistance', async () => {
   const d = (await alice.get(`/api/orders/${orderA.id}`)).body;
   assert.equal(d.order.details.startsWith('Affiche'), true); assert.equal(d.history.length, 1);
   assert.equal(d.order.client_email, undefined, 'e-mail client non exposé inutilement');
-  assert.equal(app.db.prepare('SELECT COUNT(*) n FROM orders').get().n, 1, 'enregistré en base');
+  assert.equal((await app.db.get('SELECT COUNT(*) n FROM orders')).n, 1, 'enregistré en base');
 });
 
 test('isolation : Bob ne voit pas la commande d\'Alice', async () => {
@@ -121,9 +126,10 @@ test('pièces jointes : types, signature, permissions', async () => {
   assert.equal(r.status, 422);
   r = await alice.post(`/api/orders/${orderA.id}/files`, { files: [{ name: 'faux.png', data: Buffer.from('<script>alert(1)</script>').toString('base64') }] });
   assert.equal(r.status, 422, 'signature vérifiée');
-  r = await alice.post(`/api/orders/${orderA.id}/files`, { files: [{ name: 'gros.pdf', data: Buffer.concat([Buffer.from('%PDF'), Buffer.alloc(6 * 1024 * 1024)]).toString('base64') }] });
+  r = await alice.post(`/api/orders/${orderA.id}/files`, { files: [{ name: 'gros.pdf', data: Buffer.concat([Buffer.from('%PDF'), Buffer.alloc(3.2 * 1024 * 1024)]).toString('base64') }] });
   assert.ok([413, 422].includes(r.status), 'taille limitée');
   const ok = await alice.raw(`/api/files/${fid}`); assert.equal(ok.status, 200);
+  assert.equal(Buffer.from(await ok.arrayBuffer()).toString('base64'), PNG, 'octets identiques après stockage en base');
   assert.match(ok.headers.get('content-disposition'), /attachment/);
   assert.equal((await bob.raw(`/api/files/${fid}`)).status, 404);
   assert.equal((await client().raw(`/api/files/${fid}`)).status, 401);
@@ -187,7 +193,7 @@ test('administration : catalogue CRUD, publication, suppression logique, journal
   assert.equal((await client().get(`/api/services/${slug}`)).body.service.price, 'Sur devis');
   assert.equal((await admin.del(`/api/admin/categories/${cid}`)).status, 200);
   assert.equal((await client().get(`/api/services/${slug}`)).status, 404, 'suppression logique en cascade');
-  assert.equal(app.db.prepare('SELECT COUNT(*) n FROM services WHERE id=?').get(sid).n, 1, 'ligne conservée');
+  assert.equal((await app.db.get('SELECT COUNT(*) n FROM services WHERE id=?', [sid])).n, 1, 'ligne conservée');
   const stats = (await admin.get('/api/admin/stats')).body; assert.equal(stats.total_orders, 1);
   const audit = (await admin.get('/api/admin/audit')).body.entries.map((e) => e.action);
   for (const a of ['category.create', 'service.create', 'service.update', 'category.delete', 'order.assign', 'order.status', 'user.create']) assert.ok(audit.includes(a), a);
@@ -228,8 +234,17 @@ test('injection SQL et XSS stockés sans effet', async () => {
   const r = await c.post('/api/auth/login', { email: "' OR 1=1 --", password: "' OR 1=1 --" });
   assert.equal(r.status, 401);
   assert.equal((await c.get('/api/services?q=' + encodeURIComponent("'; DROP TABLE services; --"))).status, 200);
-  assert.ok(app.db.prepare('SELECT COUNT(*) n FROM services').get().n > 0);
+  assert.ok((await app.db.get('SELECT COUNT(*) n FROM services')).n > 0);
   const sec = await c.raw('/');
   assert.match(sec.headers.get('content-security-policy'), /script-src 'self'/);
   assert.equal(sec.headers.get('x-content-type-options'), 'nosniff');
+});
+
+test('transaction : annulation complète en cas d\'erreur', async () => {
+  const before = (await app.db.get('SELECT COUNT(*) n FROM categories')).n;
+  await assert.rejects(app.db.tx(async (ex) => {
+    await ex.run("INSERT INTO categories(slug,name) VALUES('tmp-a','Tmp A')");
+    await ex.run("INSERT INTO categories(slug,name) VALUES('tmp-a','doublon')");
+  }));
+  assert.equal((await app.db.get('SELECT COUNT(*) n FROM categories')).n, before, 'rien n\'a été enregistré');
 });
